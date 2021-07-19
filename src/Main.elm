@@ -47,9 +47,10 @@ type Message
 
 init : Diagram
 init =
-    { config =
-        { boxSize = 70 
+    { dim =
+        { boxSize = 65
         , interCarriageSpace = 20
+        , interTrainSpace = 25
         , marginSize = 10
         }
     , segments =
@@ -209,28 +210,35 @@ dragsTrain diagram =
 
 widthOfCarriages : Diagram -> List Carriage -> Int
 widthOfCarriages diagram segments =
-    (List.length segments) * diagram.config.boxSize
-        + (List.length segments - 1) * diagram.config.interCarriageSpace
+    (List.length segments) * diagram.dim.boxSize
+        + (List.length segments - 1) * diagram.dim.interCarriageSpace
 
 heightOfCarriages : Diagram -> Int
 heightOfCarriages diagram =
-    diagram.config.boxSize
+    diagram.dim.boxSize
 
 widthOfDiagram : Diagram -> Int
 widthOfDiagram diagram =
      widthOfCarriages diagram diagram.segments
         + 50 -- for any interactables on the right
-        + diagram.config.marginSize -- left margin
-        + diagram.config.marginSize -- right margin
-        + (if dragsTrain diagram then 2 * diagram.config.marginSize else 0)
+        + diagram.dim.marginSize -- left margin
+        + diagram.dim.marginSize -- right margin
+        + (if dragsTrain diagram then 2 * diagram.dim.marginSize else 0)
+
+heightOfTrain : Diagram -> Int
+heightOfTrain diagram =
+    diagram.dim.marginSize -- top margin
+    + diagram.dim.marginSize -- bottom margin
+    + diagram.dim.boxSize
 
 heightOfDiagram : Diagram -> Int
 heightOfDiagram diagram =
     heightOfCarriages diagram
-        + 50 -- any interactables on the bottom
-        + diagram.config.marginSize -- top margin
-        + diagram.config.marginSize -- bottom margin
-        + (if dragsTrain diagram then 2 * diagram.config.marginSize else 0)
+        + 30 -- any interactables on the bottom
+        -- number of trains * height of each train, + inter-train space
+        + (heightOfTrain diagram + diagram.dim.interTrainSpace)
+            * (Basics.max 1 (List.length diagram.segments - 2))
+        + (if dragsTrain diagram then 2 * diagram.dim.marginSize else 0)
 
 carriageFill : Carriage -> String
 carriageFill carriage =
@@ -253,11 +261,22 @@ carriageTop diagram =
     -- top-margin + train-box margin.
     -- we ALWAYS use both to avoid suddenly shifting Y when a train-box
     -- is created.
-    toFloat diagram.config.marginSize * 2.0
+    if List.length diagram.segments <= 2 then
+        toFloat
+            ( diagram.dim.marginSize * 2
+            )
+    else
+        toFloat
+            ( diagram.dim.marginSize
+            + heightOfTrain diagram
+                * (Basics.max 0 (List.length diagram.segments - 2))
+            + diagram.dim.interTrainSpace
+                * ((List.length diagram.segments - 2))
+            )
 
 carriageCenterY : Diagram -> Float
 carriageCenterY diagram =
-    carriageTop diagram + toFloat diagram.config.boxSize / 2.0
+    carriageTop diagram + toFloat diagram.dim.boxSize / 2.0
 
 carriageLeft : Diagram -> ChainPosition -> Float
 carriageLeft diagram position =
@@ -265,19 +284,19 @@ carriageLeft diagram position =
         if dragsTrain diagram then
             if position == List.length diagram.segments - 1 then
                 -- we are the last one, and there's a dragged train
-                diagram.config.marginSize
+                diagram.dim.marginSize
                     + widthOfCarriages diagram (List.take position diagram.segments)
-                    + diagram.config.interCarriageSpace
-                    + diagram.config.marginSize * 2
+                    + diagram.dim.interCarriageSpace
+                    + diagram.dim.marginSize * 2
             else
-                diagram.config.marginSize
+                diagram.dim.marginSize
                     + widthOfCarriages diagram (List.take position diagram.segments)
-                    + diagram.config.interCarriageSpace
-                    + diagram.config.marginSize
+                    + diagram.dim.interCarriageSpace
+                    + diagram.dim.marginSize
         else
-            diagram.config.marginSize
+            diagram.dim.marginSize
                 + widthOfCarriages diagram (List.take position diagram.segments)
-                + diagram.config.interCarriageSpace
+                + diagram.dim.interCarriageSpace
 
 previousPosition : ChainPosition -> Maybe ChainPosition
 previousPosition position =
@@ -295,14 +314,14 @@ previousCarriageLineTerminationX diagram position =
             previousPosition position
             |> Maybe.map (\previous ->
                 carriageLeft diagram previous
-                    + toFloat diagram.config.boxSize
-                    + toFloat diagram.config.marginSize -- skip past intra-train margin
+                    + toFloat diagram.dim.boxSize
+                    + toFloat diagram.dim.marginSize -- skip past intra-train margin
             )
         else
             previousPosition position
             |> Maybe.map (\previous ->
                 carriageLeft diagram previous
-                    + toFloat diagram.config.boxSize
+                    + toFloat diagram.dim.boxSize
             )
 
 drawHorizontalLine : Float -> Float -> Float -> Svg a
@@ -438,8 +457,8 @@ drawCarriage diagram position carriage =
         [ rect
             [ x (fromFloat (carriageLeft diagram position))
             , y (fromFloat (carriageTop diagram))
-            , width (fromInt diagram.config.boxSize)
-            , height (fromInt diagram.config.boxSize)
+            , width (fromInt diagram.dim.boxSize)
+            , height (fromInt diagram.dim.boxSize)
             , fill (carriageFill carriage)
             --, onClick (FlipCarriage position)
             , stroke "black"
@@ -474,7 +493,7 @@ drawCarriage diagram position carriage =
                     , Svg.Attributes.cursor "pointer"
                     ]
                     [ circle
-                        [ cx (fromFloat (carriageLeft diagram position + toFloat diagram.config.boxSize - 9.4))
+                        [ cx (fromFloat (carriageLeft diagram position + toFloat diagram.dim.boxSize - 9.4))
                         , cy (fromFloat (carriageCenterY diagram - 0.3))
                         , r "7.4"
                         , fill "white"
@@ -482,7 +501,7 @@ drawCarriage diagram position carriage =
                         []
                     , g
                         [ transform ("translate ("
-                            ++ fromFloat (carriageLeft diagram position + toFloat diagram.config.boxSize - 17) ++ " "
+                            ++ fromFloat (carriageLeft diagram position + toFloat diagram.dim.boxSize - 17) ++ " "
                             ++ fromFloat (carriageCenterY diagram - 8)
                             ++ ") scale (0.03)") ]
                         [ viewIcon FontAwesome.Solid.plusCircle ]
@@ -498,8 +517,8 @@ drawCarriage diagram position carriage =
                         ]
                         [ g
                             [ transform ("translate ("
-                                ++ fromFloat (carriageLeft diagram position + toFloat diagram.config.boxSize - 14) ++ " "
-                                ++ fromFloat (carriageTop diagram + toFloat diagram.config.boxSize - 16)
+                                ++ fromFloat (carriageLeft diagram position + toFloat diagram.dim.boxSize - 14) ++ " "
+                                ++ fromFloat (carriageTop diagram + toFloat diagram.dim.boxSize - 16)
                                 ++ ") scale (0.025)")
                             ]
                             [ viewIcon FontAwesome.Solid.trash
@@ -540,10 +559,10 @@ drawTrainBox : Diagram -> Svg a
 drawTrainBox diagram =
     if dragsTrain diagram then
         rect
-            [ x (fromInt (diagram.config.marginSize))
-            , y (fromInt diagram.config.marginSize)
-            , width (fromInt (diagram.config.marginSize * 2 + widthOfCarriages diagram (List.take (List.length diagram.segments - 1) diagram.segments) ))
-            , height (fromInt (diagram.config.marginSize * 2 + heightOfCarriages diagram))
+            [ x (fromInt (diagram.dim.marginSize))
+            , y (fromFloat (carriageTop diagram - toFloat diagram.dim.marginSize))
+            , width (fromInt (diagram.dim.marginSize * 2 + widthOfCarriages diagram (List.take (List.length diagram.segments - 1) diagram.segments) ))
+            , height (fromInt (diagram.dim.marginSize * 2 + heightOfCarriages diagram))
             , stroke "black"
             , fill "transparent"
             ]
@@ -551,8 +570,8 @@ drawTrainBox diagram =
     else
         g [] []
 
-drawCarriages : Diagram -> Svg Message
-drawCarriages diagram =
+drawTrain : Diagram -> Svg Message
+drawTrain diagram =
     g
         []
         [ drawTrainBox diagram
@@ -561,6 +580,22 @@ drawCarriages diagram =
             ( List.indexedMap (drawCarriage diagram) diagram.segments )
         ]
 
+allTrains : Diagram -> List Diagram
+allTrains diagram =
+    if List.length diagram.segments <= 2 then
+        [ diagram ]
+    else
+        List.range 2 (List.length diagram.segments)
+        |> List.map (\n ->
+            { diagram | segments = List.take n diagram.segments }
+        )
+
+drawIncrementalTrain : Diagram -> Svg Message
+drawIncrementalTrain diagram =
+    g
+        []
+        ( allTrains diagram |> List.map drawTrain )
+
 svgView : Diagram -> Svg Message
 svgView diagram =
   svg
@@ -568,7 +603,7 @@ svgView diagram =
     , height (fromInt (heightOfDiagram diagram))
     , viewBox ("0 0 " ++ fromInt (widthOfDiagram diagram) ++ " " ++ fromInt (heightOfDiagram diagram))
     ]
-    [ drawCarriages diagram
+    [ drawIncrementalTrain diagram
     ]
 
 pointWithinCarriage : Diagram -> (Int, Int) -> Maybe ChainPosition
@@ -581,9 +616,9 @@ pointWithinCarriage diagram (x, y) =
                 top =
                     round <| carriageTop diagram
                 right =
-                    left + diagram.config.boxSize
+                    left + diagram.dim.boxSize
                 bottom =
-                    top + diagram.config.boxSize
+                    top + diagram.dim.boxSize
 
             in
                 left <= x && right >= x && top <= y && bottom >= y
@@ -596,7 +631,7 @@ pointNearLink diagram (x, y) =
         (\position ->
             let
                 prevRight =
-                    (round <| carriageLeft diagram (position - 1)) + diagram.config.boxSize
+                    (round <| carriageLeft diagram (position - 1)) + diagram.dim.boxSize
                 nextLeft =
                     (round <| carriageLeft diagram position)
                 centerY =
@@ -614,17 +649,29 @@ withinInteractableBoundaries diagram =
         (D.field "clientY" D.int)
     |> D.andThen
         (\coords ->
-            case ( pointWithinCarriage diagram coords, pointNearLink diagram coords ) of
-                ( Just position, _ ) ->
-                    D.succeed (ShowControlsFor position)
-                ( _, Just position ) ->
-                    D.succeed (ShowIntensityHandles position)
-                _ ->
-                    case diagram.ux of
-                        Nothing ->
-                            D.fail "No point within interactable bounds (and that's OK!)"
-                        Just _ ->
-                            D.succeed RemoveUX
+            List.foldl (\thisTrain v ->
+                case v of
+                    Nothing ->
+                        case ( pointWithinCarriage thisTrain coords, pointNearLink thisTrain coords ) of
+                            ( Just position, _ ) ->
+                                Just (ShowControlsFor position)
+                            ( _, Just position ) ->
+                                Just (ShowIntensityHandles position)
+                            _ ->
+                                Nothing
+                    Just found ->
+                        Just found
+                ) Nothing (allTrains diagram)
+            |> (\found ->
+                case ( found, diagram.ux ) of
+                    ( Nothing, Nothing ) ->
+                        D.fail "No point within interactable bounds, and no UX to remove"
+                    ( Nothing, Just _ ) ->
+                        D.succeed RemoveUX
+                    ( Just v, _ ) ->
+                        D.succeed v
+
+            )
         )
 
 view : Diagram -> Html Message

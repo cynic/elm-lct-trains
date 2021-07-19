@@ -17,9 +17,10 @@ type DragConnection
     = Intensity Intensity
     | NoPreviousCarriage
 
-type alias Configuration =
+type alias Dimensions =
     { boxSize : Int
     , interCarriageSpace : Int
+    , interTrainSpace : Int
     , marginSize : Int
     }
 
@@ -32,7 +33,7 @@ type Interactable
     | Controls ChainPosition
 
 type alias Diagram =
-    { config : Configuration
+    { dim : Dimensions
     , segments : List Carriage
     , ux : Maybe Interactable
     }
